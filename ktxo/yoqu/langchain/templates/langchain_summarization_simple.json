@@ -1,0 +1,12 @@
+{
+    "input_variables": [
+        "text"
+    ],
+    "input_types": {},
+    "output_parser": null,
+    "partial_variables": {},
+    "template": "Act as a primary school teacher and provide a concise summary of the following text. \nFormat output as plain text.\nTEXT:\n{text}",
+    "template_format": "f-string",
+    "validate_template": false,
+    "_type": "prompt"
+}

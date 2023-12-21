@@ -1,0 +1,13 @@
+{
+    "input_variables": [
+        "text"
+    ],
+    "input_types": {},
+    "output_parser": null,
+    "partial_variables": {},
+    "template": "Provide a caption and concise summary of the following text.  \nProvide a list of maximun 5 keywords based on text.\nFormat the output as a JSON string in plain text, no markdown,  with keys:\n- caption\n- summary\n- keywords\nTEXT:\n{text}\n",
+
+    "template_format": "f-string",
+    "validate_template": false,
+    "_type": "prompt"
+}

@@ -1,0 +1,19 @@
+# Default ignored files
+/shelf/
+/workspace.xml
+**/__pycache__
+**/.pytest_cache
+**/.DS_Store
+**/.idea
+*.pyc
+**/.vscode/
+**/*.log
+**/*egg-info
+**/dist
+**/build
+**/.streamlit
+**/chrome_data
+**/dump
+**/chromedriver
+**/poc*
+**/POC*

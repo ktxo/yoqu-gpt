@@ -1,0 +1,29 @@
+#
+# python -m venv yoqu
+# source yoqu/bin/activate
+# pip install --upgrade pip
+# pip install -r requirements.txt
+
+#
+#
+# API
+pydantic
+pydantic_settings
+fastapi
+uvicorn[standard]
+sqlmodel
+aiosqlite
+psutil
+#
+# RPA
+selenium
+beautifulsoup4
+
+retry
+
+#
+# Langchain custom LLM
+langchain
+
+#
+streamlit
