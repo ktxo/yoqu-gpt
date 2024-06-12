@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str
     rpa_config_file:str
+    rpa_default_name: str
     db_url:str
     api_address:str
     api_port:int
