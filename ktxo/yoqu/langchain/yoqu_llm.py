@@ -1,3 +1,4 @@
+import json
 import logging
 import os.path
 
@@ -6,8 +7,8 @@ from typing import Any, List, Mapping, Optional
 from langchain.callbacks.manager import CallbackManagerForLLMRun
 from langchain.llms.base import LLM
 from langchain.prompts import PromptTemplate, ChatPromptTemplate, load_prompt
-from ktxo.yoqu.api_client import APIWrapper
-from ktxo.yoqu.exceptions import YoquException
+from ktxo.yoqu.client.api_client import APIWrapper
+from ktxo.yoqu.common.exceptions import YoquException
 
 logger = logging.getLogger("ktxo.yoqu.langchain")
 
@@ -24,10 +25,9 @@ def load_template(name:str):
     filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates", f"{name}.json")
     return load_prompt(filename)
 
+
 def build_template(prompt:str):
     return PromptTemplate.from_template(prompt)
-
-# https://python.langchain.com/docs/modules/model_io/llms/custom_llm
 
 
 class YoquChatGPTLLM(LLM):
@@ -41,6 +41,7 @@ class YoquChatGPTLLM(LLM):
         super(YoquChatGPTLLM, self).__init__()
         self.resource = resource
         self.client: APIWrapper = APIWrapper(self.host, self.port)
+        logger.info(f"{self.__class__.__name__}")
 
     @property
     def _llm_type(self) -> str:
@@ -56,6 +57,7 @@ class YoquChatGPTLLM(LLM):
         if stop is not None:
             raise ValueError("stop kwargs are not permitted.")
         resource = kwargs.get("resource", self.resource)
+        raw_text = kwargs.get("raw_text", False)
         chat_id = None
         if self.chat:
             chat_id = self.chat["chat_id"]
@@ -63,13 +65,24 @@ class YoquChatGPTLLM(LLM):
         if chat_id:
             self.chat = self.client.update_chat(chat_id, prompt, resource)
         else:
-            self.chat = self.client.new_chat(prompt, resource)
+            self.chat = self.client.new_chat(prompt, resource, True)
         logger.debug(f"{self.chat}")
         if self.chat:
-            logger.info(f"Current chat {self.chat}")
+            logger.debug(f"Current chat {self.chat}")
             # Return last RESPONSE message
             if self.chat["messages"][-1]["type"] == "RESPONSE":
-                return self.chat["messages"][-1]["text"]
+                if raw_text:
+                    return self.chat["messages"][-1]["raw_text"]
+                if len(self.chat["messages"][-1]["code_text"]) > 0:
+                    # join all lines, code_text contains all lines returned by a "code" block in chatgpt, e.g.:
+                    # {
+                    #   "caption": "asasasas",
+                    #   "summary": "sdasd",
+                    #   "keywords": [1,1123,2]
+                    # }
+                    return "".join(self.chat["messages"][-1]["code_text"][-1]["lines"])
+                else:
+                    return self.chat["messages"][-1]["text"]
             logger.error(f"Current chat {self.chat}")
             raise YoquException(f"Error getting response from API")
 
