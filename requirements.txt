@@ -18,7 +18,7 @@ psutil
 # RPA
 selenium
 beautifulsoup4
-
+undetected-chromedriver
 retry
 
 #
@@ -27,3 +27,7 @@ langchain
 
 #
 streamlit
+
+# Setup
+setuptools
+wheel
