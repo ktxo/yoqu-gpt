@@ -8,9 +8,9 @@ import logging
 import os
 from typing import Any
 
-from ktxo.yoqu.exceptions import YoquException, YoquNotFoundException
-from ktxo.yoqu.helper import build_filename, build_folders, write_json, write_binary
-from ktxo.yoqu.model import YoquStatus, YoquStats, RPAChat, RPAMessage
+from ktxo.yoqu.common.exceptions import YoquException, YoquNotFoundException
+from ktxo.yoqu.common.helper import build_filename, build_folders, write_json, write_binary
+from ktxo.yoqu.common.model import YoquStatus, YoquStats, RPAChat, RPAMessage
 from ktxo.yoqu.rpa import RPAChrome
 
 logger = logging.getLogger("ktxo.yoqu")
@@ -30,6 +30,7 @@ class YoquResource(ABC):
         self.dump_folder = self.config.get("dump_folder", None)
         self.stats = YoquStats()
         logger.info(f"Configuration {self.config}")
+    
     @abstractmethod
     def init_resource(self, **kwargs) -> Any:
         pass
@@ -119,10 +120,11 @@ class YoquRPAChat(YoquResource):
         return False
 
     def start(self, **kwargs):
-        if self.browser.is_alive():
-            logger.info(f"Browser is alive")
-        else:
-            logger.info(f"Starting browser with '{self.browser.command}'")
+        # Not used for UC
+        # if self.browser.is_alive():
+        #     logger.info(f"Browser is alive")
+        # else:
+        #     logger.info(f"Starting browser with '{self.browser.command}'")
         # Stop if exist, ignore messages
         # self.browser.stop()
 
@@ -148,10 +150,10 @@ class YoquRPAChat(YoquResource):
         else:
             return False
 
-    def create(self, message: str, chat_name: str = None) -> RPAChat:
+    def create(self, message: str, chat_name: str = None, delete_after=False) -> RPAChat:
         if not self.is_ok():
             raise YoquException(f"RPA '{self.name}' not running")
-        return self.invoke(operation="create", name=chat_name, message=message)
+        return self.invoke(operation="create", name=chat_name, message=message, delete_after=delete_after)
 
     def send(self, chat_id: str, message: str) -> RPAChat:
         if not self.is_ok():
@@ -207,11 +209,17 @@ class YoquRPAChat(YoquResource):
         chat_name = kwargs.get("name", None)
         chat_id = kwargs.get("chat_id", None)
         message = kwargs.get("message", None)
+        delete_after = kwargs.get("delete_after", False)
         try:
             match cmd:
                 case "create":
                     chat = self._create_chat(message, chat_name)
                     logger.debug(f"Created {chat}")
+                    if delete_after:
+                        self._delete_chat(chat.chat_id)
+                        _ = self.chats.pop(0)
+                        logger.info(f"Removing {chat}")
+                        #self._load_chats() # Refreh
                     self.update_stats(ok=True)
                     return chat
                 case "chat":
@@ -277,91 +285,6 @@ class YoquRPAChat(YoquResource):
 
     def _rename_chat(self, chat_id:str, chat_name: str, new_chat_name:str):
         pass
-    #
-    # def _create(self, message: str, chat_name: str = None) -> RPAChat:
-    #     elem = self.browser.find_elements(By.CSS_SELECTOR, "span[class='truncate']")
-    #     if len(elem) > 0 and elem[0].text == "New Chat":
-    #         elem[0].click()
-    #         messages = self._send(message)
-    #         if chat_name:
-    #             self.chats[0].name = self._rename_chat(chat_name, elem[0])
-    #         self._load_chats()
-    #         return RPAChat(name=self.chats[0].name, messages=messages, chat_id=self.browser.driver.current_url)
-    #
-    # def _load_chats(self) -> list[RPAChat]:
-    #     self.chats: list[RPAChat] = []
-    #     chats = self.browser.find_elements(By.TAG_NAME, "li")
-    #     for i, chat in enumerate(chats):
-    #         if chat.get_attribute("data-projection-id"):
-    #             self.chats.append(RPAChat(name=chat.text))
-    #
-    #     logger.info(f"{len(self.chats)} chats")
-    #     return self.chats
-    #
-    # def _chat_exist(self, chat_name: str) -> bool:
-    #     for chat in self.chats:
-    #         if chat_name == chat.name:
-    #             return True
-    #     return False
-    #
-    # def _get_responses(self) -> list[RPAMessage]:
-    #     # <div data-message-author-role="assistant" data-message-id="cc9c1e44-57db-48bc-9c60-a5a64baeae27"
-    #     # <div data-message-author-role="user" data-message-id="aaa2bea0-79d9-4213-8b18-6cf6e95c9f7a"
-    #     self._wait_response()
-    #     obj = self.browser.find_element(By.CSS_SELECTOR, "div[role='presentation']")
-    #     results = []
-    #     self.browser.sleep()
-    #     elems = obj.find_elements(By.XPATH, "//div[contains(@class,'w-full text-token-text-primary')]")
-    #     for e in elems:
-    #         who_text = e.find_element(By.CSS_SELECTOR, "div[class='font-semibold select-none']").text
-    #         # obj.find_elements(By.XPATH, "//div[contains(@class,'w-full text-token-text-primary')]")[0].find_element(By.CSS_SELECTOR, "div[class='font-semibold select-none']").text
-    #         text = "\n".join(e.text.split("\n")[1:])
-    #         if who_text.lower() == "you":
-    #             results.append(RPAMessage(text, "REQUEST"))
-    #         else:  # ChatGPT
-    #             results.append(RPAMessage(text, "RESPONSE"))
-    #     return results
-    #
-    # from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
-    # @retry((NoSuchElementException, StaleElementReferenceException), delay=2, tries=3)
-    # def _wait_response(self):
-    #     stop = True
-    #     while stop:
-    #         buttons = self.browser.find_elements(By.TAG_NAME, "button")
-    #         self.browser.go_2_end_page()
-    #         if not all(print(b.text) for b in buttons):
-    #             break
-    #
-    #         for b in buttons:
-    #             if "Stop generating" in b.text:
-    #                 stop = True
-    #             if "Regenerate" in b.text:
-    #                 stop = False
-    #                 break
-    #         self.browser.sleep()
-    #
-    # def _select_chat(self, chat_name: str):
-    #     chats = self.browser.find_elements(By.TAG_NAME, "li")
-    #     found = False
-    #     for chat in chats:
-    #         if chat.get_attribute("data-projection-id"):
-    #             if chat.text == chat_name:
-    #                 chat.click()
-    #                 found = True
-    #                 break
-    #     # @ TODO esperar por las respuestas
-    #     self.browser.sleep()
-    #     return found
-    #
-    # def _send(self, message: str) -> list[RPAMessage]:
-    #     """el chat tiene que estar seleccionado antes"""
-    #     if not self.browser.send_keys(By.CSS_SELECTOR, "textarea[id='prompt-textarea']", message):
-    #         raise YoquException(f"Cannot send message")
-    #
-    #     self.browser.click(By.CSS_SELECTOR, "button[data-testid='send-button']")
-    #     responses = self._get_responses()
-    #     logger.debug(f"{len(responses)} interactions. Last: '{responses[-1].message[0:30]}...'")
-    #     return responses
 
     def info(self) -> dict:
         return {"name": self.name,
