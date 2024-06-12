@@ -36,7 +36,6 @@ async def get_status(resource_name: str, manager=Depends(get_manager), ok=Depend
 @router.post("/refresh/{resource_name}", dependencies=[Depends(valid_resource)])
 async def refresh(resource_name: str, manager=Depends(get_manager)):
     async with manager.get_resource(resource_name) as rpa:
-        print(f"Returning {rpa}")
         rpa.refresh()
         return rpa.info()
 
@@ -44,7 +43,6 @@ async def refresh(resource_name: str, manager=Depends(get_manager)):
 @router.post("/start/{resource_name}", dependencies=[Depends(valid_resource)])
 async def start(resource_name: str, manager=Depends(get_manager)):
     async with manager.get_resource(resource_name) as rpa:
-        print(f"Returning {rpa}")
         rpa.start()
         return rpa.info()
 
