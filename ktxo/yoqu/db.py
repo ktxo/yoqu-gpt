@@ -7,7 +7,7 @@ from sqlmodel import select, and_
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 
 from ktxo.yoqu.config import settings
-from ktxo.yoqu.model import Messages
+from ktxo.yoqu.common.model import Messages
 
 logger = logging.getLogger("ktxo.yoqu")
 
@@ -60,7 +60,7 @@ async def add_message(session:AsyncSession,
         logger.error(f"Encountered an error while accessing the DB. ({e})")
         return None
 
-from ktxo.yoqu.model import RPAChat
+from ktxo.yoqu.common.model import RPAChat
 async def add_message2(session:AsyncSession,
                       chat: RPAChat) -> Messages:
     #async with AsyncSession(engine, expire_on_commit=False) as session:
