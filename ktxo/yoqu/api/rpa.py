@@ -9,9 +9,10 @@ logger = logging.getLogger("ktxo.yoqu")
 
 
 rpa_manager:RPAManager = None
+
 def init_rpa():
     global rpa_manager
-    rpa_manager = RPAManager(settings.rpa_config_file )
+    rpa_manager = RPAManager(settings.rpa_config_file, settings.rpa_default_name)
 
 async def get_manager():
     global rpa_manager
