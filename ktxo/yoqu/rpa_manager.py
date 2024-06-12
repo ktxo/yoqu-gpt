@@ -19,13 +19,13 @@ from ktxo.yoqu.resource.rpa_chatgpt import RPAChatGPTResource
 
 
 class RPAManager():
-    def __init__(self, config: dict|str):
+    def __init__(self, config: dict|str, default_resource:str = None):
         if isinstance(config, str):
             with open(config, "r", encoding="utf-8") as fd:
                 self.config = json.load(fd)
         else:
             self.config = copy.deepcopy(config)
-
+        self.default_resource = default_resource
         self.rpas:dict[str, YoquRPAChat] = {}
         self.locks = {}
         logger.info(f"Starting....")
@@ -88,7 +88,9 @@ class RPAManager():
                 return rpa
 
     @asynccontextmanager
-    async def get_resource(self, name) -> YoquRPAChat:
+    async def get_resource(self, name:str = None) -> YoquRPAChat:
+        if not name:
+            name = self.default_resource
         if name not in self.locks:
             raise YoquException(f"Resource '{name}' not found")
         async with self.locks[name]:

@@ -19,19 +19,15 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 # message.Keys.chord(Keys.SHIFT, Keys.ENTER)
+from selenium.common.exceptions import WebDriverException
 
+import undetected_chromedriver as uc
 
-
-
-from selenium.common.exceptions import WebDriverException, TimeoutException, NoSuchElementException, StaleElementReferenceException
-
-from ktxo.yoqu.exceptions import YoquException
-from ktxo.yoqu.helper import ProcessHelper, build_filename, normalize_url
+from ktxo.yoqu.common.exceptions import YoquException
+from ktxo.yoqu.common.helper import ProcessHelper, build_filename, normalize_url
 
 
 logger = logging.getLogger("ktxo.yoqu")
-
-
 
 # Dummy copy to avoid reference to Selenium
 class BY(object):
@@ -60,9 +56,9 @@ class RPAChrome():
         self.driver: webdriver.Chrome = None
 
         self.options = webdriver.ChromeOptions()
-        for o in self.config["options"]:
+        for o in self.config.get("options",[]):
             self.options.add_argument(o)
-        for o in self.config["options_experimental"]:
+        for o in self.config.get("options_experimental",[]):
             if isinstance(o, list):
                 self.options.add_experimental_option(*o)
             else:
@@ -82,46 +78,30 @@ class RPAChrome():
 
     def _connect(self):
         try:
-            #self.driver = webdriver.Chrome(executable_path=self.config["chromedriver"], options=self.options, service_log_path="log.txt")
-            self.driver = webdriver.Chrome(service=Service(executable_path=self.config["chromedriver"]),
-                                           options=self.options)
+            if not self.is_alive():
+                self.driver = uc.Chrome(options=self.options, **self.config["uc_options"])
+                self.process_pid = self.driver.browser_pid
+            else:
+                logger.info(f"Browser pid={self.process_pid} already started, ignoring")
         except WebDriverException as we:
             logger.error(f"Cannot connect to process")
             raise YoquException(we.msg)
         return self.driver
 
-    # def connect(self):
-    #     self.driver = self._connect()
-    #     self.driver.get(self.config["url"])
-    #     self.sleep()
-    #     if self.url_title and self.driver.title != self.url_title:
-    #         logger.error(f"Cannot go to {self.url}, current is '{self.driver.current_url}' ({self.driver.title})")
-    #         if self.debug:
-    #             self.save_screenshot()
-    #         raise Exception(f"Cannot go to {self.url}")
-    #     logger.info(f"Process command='{self.command}' started, pid={self.process_pid}")
     def start(self):
-        self.process_pid = ProcessHelper.process_exist(self.command, self.process_pid)
-        if self.process_pid > 0:
-            if not self.driver:
-                self._connect()
-            logger.warning(f"Process with pid={self.process_pid} exist, command='{self.command}', ignoring")
-            return
-        logger.info(f"Process command='{self.command}' not exist, starting")
-        self.process_pid = ProcessHelper.start_process(self.command)
-        if self.process_pid == -1:
-            logger.error(f"Cannot start process command='{self.command}'")
-            raise YoquException(f"Cannot start process command='{self.command}'")
         self.driver = self._connect()
-        self.driver.get(self.config["url"])
+        self.go2url(self.config["url"])
         self.sleep()
 
         if self.url_title and self.driver.title != self.url_title:
             logger.error(f"Cannot go to {self.url}, current is '{self.driver.current_url}' ({self.driver.title})")
             if self.debug:
                 self.save_screenshot()
-            raise Exception(f"Cannot go to {self.url}")
-        logger.info(f"Process command='{self.command}' started, pid={self.process_pid}")
+            raise YoquException(f"Cannot go to {self.url}")
+        logger.info(f"Browser started, pid={self.process_pid}")
+
+    def go2url(self, url:str):
+        self.driver.get(url)
 
     def save_screenshot(self, url) -> str:
         filename = f"{normalize_url(url)}.png"
@@ -129,38 +109,33 @@ class RPAChrome():
         self.driver.save_screenshot(filename)
         return filename
 
-    def _quit(self, process):
+    def _quit(self):
         try:
             if self.driver:
                 self.driver.quit()
-        except Exception as e:
-            logger.warning(f"Ignoring {e}")
-        try:
-            if self.process:
-                self.process.terminate()
+                self.process_pid = -1
         except Exception as e:
             logger.warning(f"Ignoring {e}")
 
     def stop(self):
-        self.process = ProcessHelper.get_process(self.command)
-        if not self.process:
-            self.process_pid = -1
+        if not self.is_alive():
             logger.warning(f"Process not exist, ignoring")
         else:
-            self.process_pid = self.process.pid
             logger.info(f"Stopping process command='{self.command} pid={self.process_pid}")
-        self._quit(self.process)
-        self.process = None
+            self._quit()
+
 
     def restart(self):
         self.stop()
         self.start()
         return self.process
-        pass
 
     def is_alive(self):
-        self.process_pid = ProcessHelper.process_exist(self.command, self.process_pid)
-        return self.process_pid != -1
+        if not self.driver:
+            return False
+        if self.driver.service.process.poll() is None and self.driver.window_handles != []:
+            return True
+        return False
 
     def status(self):
         return {"pid": self.process_pid, "command": self.command, "alive": self.is_alive()}
@@ -175,7 +150,6 @@ class RPAChrome():
     @retry()
     def find_element(self, by, value):
         return self.driver.find_element(by, value)
-
 
 
     def find_elements(self, by, value):
