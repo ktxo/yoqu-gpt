@@ -4,7 +4,7 @@ from io import StringIO
 
 import streamlit as st
 
-from ktxo.yoqu.api_client import APIWrapper
+from ktxo.yoqu.client.api_client import APIWrapper
 from ktxo.yoqu.langchain.yoqu_llm import YoquChatGPTLLM, load_template, save_template, build_template
 
 st.set_page_config(layout="wide")

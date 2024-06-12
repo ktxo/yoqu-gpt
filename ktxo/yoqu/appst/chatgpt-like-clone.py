@@ -2,7 +2,7 @@
 import json
 
 import streamlit as st
-from ktxo.yoqu.api_client import APIWrapper
+from ktxo.yoqu.client.api_client import APIWrapper
 
 st.title("(Yoqu) ChatGPT-like clone")
 with st.expander("About this 🤌"):
