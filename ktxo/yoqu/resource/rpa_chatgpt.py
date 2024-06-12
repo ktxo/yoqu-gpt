@@ -4,8 +4,8 @@ import time
 
 from retry import retry
 
-from ktxo.yoqu.exceptions import YoquException
-from ktxo.yoqu.model import RPAChat, RPAMessage, RPAMessageCode
+from ktxo.yoqu.common.exceptions import YoquException
+from ktxo.yoqu.common.model import RPAChat, RPAMessage, RPAMessageCode
 from ktxo.yoqu.base import YoquRPAChat
 
 from selenium.webdriver.common.by import By
@@ -28,26 +28,33 @@ class RPAChatGPTResource(YoquRPAChat):
         return len(self.browser.find_elements(By.CSS_SELECTOR, "div[id='challenge-stage']")) > 0
 
     def _create_chat(self, message: str, chat_name: str = None) -> RPAChat:
-        elem = self.browser.find_elements(By.XPATH, "//div[text()='New chat']")
-        if len(elem) > 0 and elem[0].text.lower() == "new chat":
+        #elem = self.browser.find_elements(By.XPATH, "//div[text()='New chat']")
+        p = "a[class='group flex h-10 items-center gap-2 rounded-lg bg-token-sidebar-surface-primary px-2 font-semibold juice:gap-2.5 juice:font-normal hover:bg-token-sidebar-surface-secondary']"
+        elem = self.browser.find_elements(By.CSS_SELECTOR, p)
+        if len(elem) > 0 and elem[0].text == "ChatGPT":
             elem[0].click() # New Chat
             messages = self._send(message)
             self._load_chats() # Refresh current list
             chat = RPAChat(name=self.chats[0].name, messages=messages, chat_id=self.chats[0].chat_id)
             if chat_name:
-                self.chats[0].name = self._rename_chat(chat.chat_id, chat_name)
+                self.chats[0].name = self._rename_chat(chat.chat_id, chat.name, chat_name)
             return chat
+        return None
 
-    def _extract_code(self, raw_text) -> list[RPAMessageCode]:
-        from bs4 import BeautifulSoup
-        soup = BeautifulSoup(raw_text, 'html.parser')
-        # block = [e.text for e  in soup.find_all("pre")]
-        blocks = [e for e in soup.find_all("pre")]
+    def _extract_code(self, elem) -> list[RPAMessageCode]:
+        blocks = elem.find_elements(By.TAG_NAME, "pre")
         code = []
         for block in blocks:
-            type = block.find_all("span")[0].text
-            lines = block.find_all("code")[0].text.split("\n")
-            code.append(RPAMessageCode(type=type, lines=lines))
+            type_, lines = "", []
+            elems = block.find_elements(By.TAG_NAME, "span")
+            if len(elems) > 0:
+                type_ = elems[0].text
+            elems = block.find_elements(By.TAG_NAME, "code")
+            if len(elems) > 0:
+                lines = elems[0].text.split("\n")
+            if type_ == "" or lines == []:
+                print()
+            code.append(RPAMessageCode(type_=type_, lines=lines))
         return code
 
     def _load_chatsBS(self) -> list[RPAChat]:
@@ -80,19 +87,6 @@ class RPAChatGPTResource(YoquRPAChat):
     def _load_chats(self) -> list[RPAChat]:
         return self._load_chatsBS()
         self.chats: list[RPAChat] = []
-        # #container = self.browser.find_elements(By.XPATH, "//*nav[aria-label='Chat history']")
-        # chats = self.browser.find_elements(By.TAG_NAME, "li")
-        # chats = self.browser.find_elements(By.XPATH, "//li[@data-projection-id]")
-        # for i, chat in enumerate(chats):
-        #     if chat.get_attribute("data-projection-id"):
-        #         url = chat.find_elements(By.TAG_NAME, "a")[0].get_attribute("href")
-        #         self.chats.append(RPAChat(chat_id=self.extract_id(url),
-        #                                   name=chat.text,
-        #                                   type=self.type,
-        #                                   resource=self.name))
-        #
-        # logger.debug(f"Found {len(chats)} chats")
-        # return self.chats
 
     def _chat_exist(self, chat_id: str) -> bool:
         for chat in self.chats:
@@ -105,28 +99,17 @@ class RPAChatGPTResource(YoquRPAChat):
         obj = self.browser.find_element(By.CSS_SELECTOR, "div[role='presentation']")
         results = []
         self.browser.sleep()
-        elems = obj.find_elements(By.XPATH, "//div[contains(@class,'w-full text-token-text-primary')]")
-        for e in elems:
-            message_id = e.find_element(By.XPATH, ".//div[@data-message-id]").get_attribute("data-message-id")
-            who_text = e.find_element(By.CSS_SELECTOR, "div[class='font-semibold select-none']").text
-            if who_text.lower() == "you":
-                raw_text = ""
-                code_text = []
-            else:
-                # Content Policy violation messages
-                e_ = e.find_elements(By.XPATH, "//a[text()='content policy']")
-                if len(e_) > 0:
-                    raw_text = e.text
-                    code_text= []
-                else:
-                    raw_text = e.find_element(By.CSS_SELECTOR, "div[class*='markdown']").get_attribute("innerHTML")
-                    code_text= self._extract_code(raw_text)
-            text = "\n".join(e.text.split("\n")[1:])
-
-            if who_text.lower() == "you":
-                type_ = "REQUEST"
-            else:  # ChatGPT
+        messages = obj.find_elements(By.XPATH, "//div[contains(@class, 'w-full text-token-text-primary')]")
+        for m in messages:
+            message_id = m.find_element(By.XPATH, ".//div[@data-message-id]").get_attribute("data-message-id")
+            t = m.find_elements(By.XPATH, ".//div[contains(@class, 'gizmo-bot-avatar')]")
+            type_ = "REQUEST"
+            if len(t) > 0:
                 type_ = "RESPONSE"
+            raw_text = ""
+            code_text = self._extract_code(m)
+            text = "\n".join(m.text.split("\n"))
+
             results.append(RPAMessage(id=message_id,
                                       text=text,
                                       type=type_,
@@ -134,26 +117,23 @@ class RPAChatGPTResource(YoquRPAChat):
                                       code_text= code_text))
         return results
 
-    from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
-    @retry((NoSuchElementException, StaleElementReferenceException), delay=2, tries=3)
     def _wait_response(self):
         stop = False
         counter = 0
         self.browser.sleep()
         t0 = time.time()
         while not stop:
-            container = self.browser.find_elements(By.CSS_SELECTOR, "div[role='presentation']")
-            if len(container):
-                e = container[0].find_elements(By.XPATH,
-                                          "//*[name()='path' and @d='M4.5 2.5C5.05228 2.5 5.5 2.94772 5.5 3.5V5.07196C7.19872 3.47759 9.48483 2.5 12 2.5C17.2467 2.5 21.5 6.75329 21.5 12C21.5 17.2467 17.2467 21.5 12 21.5C7.1307 21.5 3.11828 17.8375 2.565 13.1164C2.50071 12.5679 2.89327 12.0711 3.4418 12.0068C3.99033 11.9425 4.48712 12.3351 4.5514 12.8836C4.98798 16.6089 8.15708 19.5 12 19.5C16.1421 19.5 19.5 16.1421 19.5 12C19.5 7.85786 16.1421 4.5 12 4.5C9.7796 4.5 7.7836 5.46469 6.40954 7H9C9.55228 7 10 7.44772 10 8C10 8.55228 9.55228 9 9 9H4.5C3.96064 9 3.52101 8.57299 3.50073 8.03859C3.49983 8.01771 3.49958 7.99677 3.5 7.9758V3.5C3.5 2.94772 3.94771 2.5 4.5 2.5Z']")
-                if len(e) >= 2:
-                    stop = True
-                else:
-                    self.browser.sleep()
-                    if (time.time() - t0) > 60:
-                        raise YoquException(f"Timeout waiting response")
+            # if self._continue_generating_regenerate():
+            #     continue
+            send_button = self._get_send_button()
+
+            if send_button:
+                print(send_button.text)
+                stop = True
             else:
-                raise YoquException(f"Cannot locate element. Please retry the operation")
+                self.browser.sleep()
+                if (time.time() - t0) > 600:
+                    raise YoquException(f"Timeout waiting response")
 
     def chat_id_url(self, chat_id:str):
         return f"https://chat.openai.com/c/{chat_id}"
@@ -177,19 +157,44 @@ class RPAChatGPTResource(YoquRPAChat):
         #self.browser.sleep()
         return found
 
+    def _get_send_button(self):
+        """ChatGPT changed "send button"""
+        # SVG data
+        svg_d = "M15.192 8.906a1.143 1.143 0 0 1 1.616 0l5.143 5.143a1.143 1.143 0 0 1-1.616 1.616l-3.192-3.192v9.813a1.143 1.143 0 0 1-2.286 0v-9.813l-3.192 3.192a1.143 1.143 0 1 1-1.616-1.616z"
+        e = self.browser.find_elements(By.XPATH, f"//*[name()='path' and @d='{svg_d}']")
+        if len(e) > 0:
+            return e[0]
+        else:
+            return None
+
+
     def _send(self, message: str) -> list[RPAMessage]:
         # Chat must be selected before execute this function
         self.browser.sleep()
         if not self.browser.send_keys(By.CSS_SELECTOR, "textarea[id='prompt-textarea']", message):
             raise YoquException(f"Cannot send message")
 
-        self.browser.click(By.CSS_SELECTOR, "button[data-testid='send-button']")
+        b = self._get_send_button()
+        if b is None:
+            raise YoquException("Cannot send message (send button not found)")
+        b.click()
         responses = self._get_responses()
         logger.debug(f"{len(responses)} messages. Last: '{responses[-1].text[0:30]}...'")
         return responses
 
     def _delete_chat(self, chat_id: str):
-        # @TODO
-        if self._select_chat(chat_id):
-            pass
-
+        #chat = self._select_chat(chat_id)
+        if chat_id:
+            logger.debug(f"Deleting {chat_id}")
+            # Restriction: only first item
+            self.browser.sleep([0.5, 2])
+            elem = self.browser.find_elements(By.CSS_SELECTOR, "button[data-state='closed']")
+            if len(elem) > 0:
+                self.browser.sleep([1.2, 2])
+                elem[0].click()
+                # Share, Rename, Delete
+                self.browser.find_elements(By.CSS_SELECTOR, "div[role='menuitem']")[2].click()
+                elem = self.browser.find_elements(By.CSS_SELECTOR, "button[class='btn relative btn-danger']")
+                if len(elem) > 0:
+                    self.browser.sleep([1, 2])
+                    elem[0].click()
