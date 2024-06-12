@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 import json
 import logging.config
 
@@ -5,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from ktxo.yoqu.config import settings
-from ktxo.yoqu.exceptions import YoquException
+from ktxo.yoqu.common.exceptions import YoquException
 from ktxo.yoqu.api.rpa import init_rpa
 from ktxo.yoqu.api.internal import api_admin
 from ktxo.yoqu.api.routers import api_resource, api_db
@@ -41,10 +42,15 @@ More details in repository [https://github.com/ktxo/yoqu-gpt](https://github.com
 # ----------------------------------------------------------------------
 logger = logging.getLogger("ktxo.yoqu")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_rpa()
+    yield
+    # Cleanup
+    logger.info(f"Lifespan end.")
 
-app = FastAPI(title="Yoqu API", description=api_description, openapi_tags=tags_metadata )
-init_rpa()
 
+app = FastAPI(title="Yoqu API", description=api_description, openapi_tags=tags_metadata, lifespan=lifespan)
 app.include_router(api_admin.router)
 app.include_router(api_resource.router)
 app.include_router(api_db.router)
