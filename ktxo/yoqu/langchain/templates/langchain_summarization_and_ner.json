@@ -5,7 +5,7 @@
     "input_types": {},
     "output_parser": null,
     "partial_variables": {},
-    "template": "Provide a caption and concise summary of the following text.  \nPerform  a NER (Named Entity Recognition) analysis and extract tags  from text, use common tags from common frameworks (SpaCy, NLTK, etc).\nProvide a list of maximun 5 keywords based on text.\nFormat the output as a JSON string in plain text, no markdown,  with keys:\n- caption\n- summary\n- keywords\n- entities: \nTEXT:\n{text}",
+    "template": "Provide a caption and concise summary of the following text.  \nPerform  a NER (Named Entity Recognition) analysis and extract tags  from text, use common tags from common frameworks (SpaCy, NLTK, etc).\nProvide a list of maximun 5 keywords based on text.\nOutput must be formatted as a json string, don't provide code,  with keys:\n- caption\n- summary\n- keywords\n- entities: \nTEXT:\n{text}",
     "template_format": "f-string",
     "validate_template": false,
     "_type": "prompt"

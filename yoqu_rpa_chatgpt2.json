@@ -15,12 +15,18 @@
       "--remote-debugging-port=9223",
       "--user-data-dir=chrome_data/chatgpt2"
     ],
-    "chromedriver": "./chromedriver",
+    "__chromedriver": "./undetected_chromedriver",
     "sleep_range": [1, 3],
-    "options": ["--log-level=0", "--disable-logging", "--disable-dev-shm-usage"],
+    "options_": ["--log-level=0", "--disable-logging", "--disable-dev-shm-usage"],
     "options_experimental": [
       ["debuggerAddress", "127.0.0.1:9223"]
-    ]
+    ],
+    "uc_options": {
+      "headless": false,
+      "use_subprocess": true,
+      "user_data_dir": "chrome_data/chatgpt2",
+      "driver_executable_path": "./undetected_chromedriver"
+    }
   },
   "wait": 10
 }

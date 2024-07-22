@@ -5,7 +5,7 @@
     "input_types": {},
     "output_parser": null,
     "partial_variables": {},
-    "template": "Provide the     shortest synonym for the following text:\n{text}",
+    "template": "Provide the shortest synonym for the following text:\n{text}",
     "template_format": "f-string",
     "validate_template": false,
     "_type": "prompt"
