@@ -29,10 +29,14 @@ class RPAChatGPTResource(YoquRPAChat):
 
     def _create_chat(self, message: str, chat_name: str = None) -> RPAChat:
         #elem = self.browser.find_elements(By.XPATH, "//div[text()='New chat']")
-        p = "a[class='group flex h-10 items-center gap-2 rounded-lg bg-token-sidebar-surface-primary px-2 font-semibold juice:gap-2.5 juice:font-normal hover:bg-token-sidebar-surface-secondary']"
+        # ChatGPT must be opened with sidebar expanded
+        p = "button[class='h-10 rounded-lg px-2 text-token-text-secondary focus-visible:outline-0 hover:bg-token-sidebar-surface-secondary focus-visible:bg-token-sidebar-surface-secondary']"
+
         elem = self.browser.find_elements(By.CSS_SELECTOR, p)
-        if len(elem) > 0 and elem[0].text == "ChatGPT":
-            elem[0].click() # New Chat
+        #if len(elem) > 0 and elem[0].text == "ChatGPT":
+        if len(elem) > 0:
+            #elem[0].click() # New Chat
+            elem[1].click()  # New Chat
             messages = self._send(message)
             self._load_chats() # Refresh current list
             chat = RPAChat(name=self.chats[0].name, messages=messages, chat_id=self.chats[0].chat_id)
@@ -52,8 +56,6 @@ class RPAChatGPTResource(YoquRPAChat):
             elems = block.find_elements(By.TAG_NAME, "code")
             if len(elems) > 0:
                 lines = elems[0].text.split("\n")
-            if type_ == "" or lines == []:
-                print()
             code.append(RPAMessageCode(type_=type_, lines=lines))
         return code
 
